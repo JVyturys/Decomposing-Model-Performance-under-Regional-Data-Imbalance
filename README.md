@@ -31,7 +31,7 @@ Multi-country studies that predict ESG ratings with machine learning report accu
 
 **Keywords**: ESG rating prediction, regional data imbalance, performance gap decomposition, tabular foundation models, in-context learning, TabPFN, TabICL, FT-Transformer, gradient boosting, data depletion
 
-**Full text**: [link to the published thesis, added after submission]
+**Full text**: [link to the published thesis, will be added after submission]
 
 ## Working with the repo
 
