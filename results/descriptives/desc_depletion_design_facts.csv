@@ -1,0 +1,46 @@
+fact,value,source
+anchor_region,100089,config.ANCHOR_REGION
+anchor_rows_tv,17671,depletion_counts.anchor_rows_full
+anchor_entities_tv,1923,depletion_counts.anchor_entities_full
+anchor_test_rows,7572,manifests n_r
+tier1_test_rows,25177,manifests sum n_r
+anchor_test_share,0.30075068514914405,manifests n_r
+equal_n_region,100218,config.EQUAL_N_REGION
+equal_n_rows_tv,384,desc_depletion_composition undepl
+equal_n_entities_tv,63,desc_depletion_composition undepl
+equal_n_test_rows,157,manifests n_r
+context_rows_full,58806,desc_depletion_conditions undepl
+non_anchor_context_rows,41135,desc_depletion_conditions context - anchor
+levels,8000/4000/2000/1000/350,DEPLETION_GRID
+repeats,2/3/3/5/5,DEPLETION_GRID
+n_conditions,18,DEPLETION_GRID
+bottom_level,350,DEPLETION_GRID
+bottom_realised_min,361,depletion_counts
+bottom_realised_max,383,depletion_counts
+bottom_realised_mean,373.0,depletion_counts
+bottom_vs_equal_n,below,derived
+bottom_mean_minus_equal_n_rows,-11.0,derived
+bottom_mean_minus_equal_n_share,-0.028645833333333332,derived
+n_strata,4,build_depletion_draws.N_STRATA
+overshoot_mean_rows,23.666666666666668,depletion_counts.overshoot_rows
+anchor_rows_per_entity,9.18928757150286,depletion_counts
+overshoot_per_stratum_rows,5.916666666666667,derived
+overshoot_per_stratum_entities,0.643865655593911,derived
+manifests_frozen_context,90/90,manifests context rows/entities vs depletion_counts
+test_rows,25221,manifests test partition
+test_features,125,manifests test partition
+manifests_test_set,96/96,manifests test partition + n_r
+manifests_locked_hp,90/90,manifests hyperparameters vs undepleted configuration
+draw_build_commit,bced3bd,manifests draw build commit
+anchor_val_rows_undepl,2554,desc_depletion_conditions
+anchor_val_rows_bottom_min,23,desc_depletion_conditions
+anchor_val_rows_bottom_max,71,desc_depletion_conditions
+val_rows_undepl,8425,desc_depletion_conditions
+val_rows_bottom_min,5894,desc_depletion_conditions
+val_rows_bottom_max,5942,desc_depletion_conditions
+ftt_undepl_epochs,265,ftt undepleted manifest
+ftt_undepl_steps,52205,ftt depleted manifests undepl steps
+ftt_steps_L8000_min,16019,ftt manifests refit steps
+ftt_steps_L8000_max,41856,ftt manifests refit steps
+ftt_steps_L350_min,7661,ftt manifests refit steps
+ftt_steps_L350_max,12877,ftt manifests refit steps

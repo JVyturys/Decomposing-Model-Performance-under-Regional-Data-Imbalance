@@ -1,0 +1,7 @@
+step,role,n_features,vl_bound
+candidates,stage,242,
+not_in_panel,dropped,0,
+panel_features,stage,242,
+degenerate_variance,dropped,5,
+vl_cutoff,dropped,112,0.09287280880613827
+retained,stage,125,0.06939154190163034

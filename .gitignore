@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Editors and notebooks
+.vscode/
+.ipynb_checkpoints
+*.ipynb
+
+# Credentials (WRDS username); see log_config.example.py
+*log_config.py
+
+# Data and model weights: WRDS-licensed, never committed
+data/
+/models/
+weights/
+*.pth
+*.pt
+*.safetensors
+*.parquet
+*.csv
+
+# Results: only aggregate tables and figures are published
+results/*
+!results/tables/
+!results/descriptives/
+!results/tables/*.csv
+!results/descriptives/*.csv
+# figures: only the 25 thesis figures
+!results/visualization/
+results/visualization/*
+!results/visualization/descriptives/
+results/visualization/descriptives/*
+!results/visualization/descriptives/esg_coverage_per_region.png
+!results/visualization/descriptives/coverage_region_year.png
+!results/visualization/descriptives/obs_per_entity.png
+!results/visualization/descriptives/target_distribution_by_region.png
+!results/visualization/descriptives/partition_shares.png
+!results/visualization/descriptives/imputation_by_region.png
+!results/visualization/descriptives/depletion_design_schematic.png
+!results/visualization/descriptives/depletion_strata.png
+!results/visualization/descriptives/depletion_pool_share.png
+!results/visualization/descriptives/depletion_target.png
+!results/visualization/descriptives/depletion_draw_distributions.png
+!results/visualization/descriptives/pooled_vs_macro_r_sq.png
+!results/visualization/descriptives/region_r_sq_heatmap.png
+!results/visualization/descriptives/region_r_sq_vs_size.png
+!results/visualization/descriptives/r_sq_scale_identity.png
+!results/visualization/descriptives/residual_bias_by_region.png
+!results/visualization/descriptives/gap_curve_r_sq.png
+!results/visualization/descriptives/metric_curves.png
+!results/visualization/descriptives/gap_share_removed.png
+!results/visualization/descriptives/headline_changes.png
+!results/visualization/descriptives/did_decomposition.png
+!results/visualization/descriptives/region_delta_r_sq_deepest.png
+!results/visualization/descriptives/gap_contributions.png
+!results/visualization/descriptives/anchor_learning_curve.png
+!results/visualization/descriptives/prediction_dispersion.png
+
+# Run locks written by the ICL depletion grid
+model_scores/**/claim_*.json
+
+# Text and documents (requirements.txt is the exception)
+*.txt
+!requirements.txt
+*.pdf
+
+# Screen captures created when a .py file is run by the shell
+# (bash treats "import os" as ImageMagick's screenshot command)
+/os
+/np
+/pd
+/plt
+/sns
+*.ps
+*.postscript
+
+# Archived code
+archive/

@@ -1,0 +1,9 @@
+key_source,key_source_name,parent_typecode,entities,clusters,rows
+0,singleton,none,3,3,10
+1,ultimate,CLGUN,1,1,4
+1,ultimate,COM,8655,7766,75274
+1,ultimate,NGO,38,28,357
+1,ultimate,UNK,171,165,959
+2,immediate,CINV,19,19,129
+2,immediate,GVT,826,622,7289
+2,immediate,GVTDA,2,2,27

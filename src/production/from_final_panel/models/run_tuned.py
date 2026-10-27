@@ -1,0 +1,204 @@
+"""
+src.production.from_final_panel.models.run_tuned
+"""
+import config as con, utils as ut, pandas as pd, numpy as np
+import time
+import yaml
+import subprocess
+from stageguard import Gatekeeper
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.model_selection import ParameterSampler
+from scipy.stats import loguniform, uniform
+from datetime import datetime
+
+LIBRARIES: dict[str, tuple[str, ...]] = {
+    'rf': ('numpy', 'pandas', 'scikit-learn'),
+    'xgb': ('numpy', 'pandas', 'scikit-learn', 'xgboost'),
+}
+
+
+SEARCH_SPACES = {
+    "rf":  {'max_features':(0.05, 0.1, 0.2, 0.33, 0.5, 0.75, 1.0),
+            'min_samples_leaf':(1, 2, 5, 10, 20),
+            'max_depth':(None, 10, 20, 30)}, 
+            
+    "xgb": {"learning_rate":loguniform(0.01, 0.3), 'n_estimators':(200, 400, 800, 1500), 'max_depth':(3, 4, 6, 8, 10),
+            'min_child_weight':loguniform(1, 20), 'subsample': uniform(0.6, 0.4), 'colsample_bytree':uniform(0.5, 0.5),
+            'reg_lambda':loguniform(0.1, 20)}	
+}
+
+def build_estimator(model_tag: str, params: dict):
+    """Return an unfitted estimator for `model_tag` configured with `params`.
+    """
+    if model_tag == 'rf':
+        model = RandomForestRegressor(n_estimators = 500,
+                                        random_state = con.SEED,
+                                        n_jobs = -1,
+                                        **params)
+        return model
+    elif model_tag=='xgb':
+        model= XGBRegressor(random_state=con.SEED, **params)
+        return model
+    else:
+        raise ValueError(f"expected model 'rf' or 'xgb', saw {model_tag}")
+
+def search(model_tag, X_fit, y_fit, X_val, y_val, n_iter, seed=con.SEED) -> tuple[dict, list]:
+    """Score `n_iter` sampled configurations on stage-2 data.
+    Returns (winning_params, trial_log). trial_log records every sampled
+    configuration and its stage-2 score, the spread provides
+    evidence about differential tunability."""
+    sampler = ParameterSampler(SEARCH_SPACES[model_tag], n_iter=n_iter, random_state=seed)
+
+    # initialize placeholders
+    search_log = []
+    winning_score = np.inf
+    winning_params = None
+
+    # perform tuning
+    for params in sampler:
+        model = build_estimator(model_tag=model_tag, params=params)
+        model.fit(X_fit, y_fit)
+        y_pred = model.predict(X_val)
+        y_pred = pd.Series(y_pred, index=y_val.index)
+        metrics = ut.pooled_metrics(y_true=y_val, y_pred=y_pred)
+        rmse = np.sqrt(metrics[0]/(len(y_val)))
+
+        # log current configuration results
+        search_log.append([model_tag, params, rmse])
+
+        # check for optimum
+        if rmse < winning_score:
+            winning_score = rmse
+            winning_params = params
+        else:
+            pass
+
+    return winning_params, search_log
+
+def run_tuned(model_tag: str, condition: str = "undepl", configuration: str = 'tuned', n_iter: int = 30) -> None:
+    """Hoisted stage 1+2 -> search → refit on stage 3 -> score stage 4 -> persist."""
+    # start time counter 
+    git = ut.git_state()
+    start_total = time.perf_counter()
+    gk = Gatekeeper(model="nICL")
+
+    # initiallize data pipeline
+    X_fit, y_fit = gk.stage_one_data()
+    X_val, y_val = gk.stage_two_data()
+
+    # perform hyperparameter tuning
+    print(f'      [>>>] starting model selection for {model_tag}...')
+    start_tuning = time.perf_counter()
+    params, log = search(model_tag, X_fit, y_fit, X_val, y_val, n_iter)
+    end_tuning = time.perf_counter() -start_tuning
+    model = build_estimator(model_tag=model_tag, params=params)
+    print(f'      [>>>] model selection succesfull; duration: {round(end_tuning/60,2)}min')
+
+    # fit on training partition
+    print(f'      [>>>] fitting {model_tag} model on train partition...')
+    start_training = time.perf_counter()
+    X_tr, y_tr = gk.stage_three_data()
+    model.fit(X_tr, y_tr)
+    end_training = time.perf_counter() - start_training
+    print(f'      [>>>] fitting train partition successfull; duration {round(end_training/60,2)}min')
+
+    # score
+    print(f'      [>>>] predicting on test partition ...')
+    start_testing = time.perf_counter()
+    X_test, y_test, geo_id = gk.stage_four_data()
+    y_pred = model.predict(X_test)
+    end_testing = time.perf_counter() - start_testing
+    print(f'      [>>>] predicitons successfully calculated; duration {round(end_testing/60,2)}min')
+    y_pred = pd.Series(y_pred, index=y_test.index)
+
+    # calculate metrics 
+    print(f'      [>>>] calculating scores & saving+logging results to drive ...')
+    metrics_per_region = ut.per_region_metrics(y_true=y_test, y_pred=y_pred, geoID=geo_id)
+    metrics_pooled = ut.pooled_metrics(y_true=y_test, y_pred=y_pred)
+    metrics_average = ut.macro_average_metrics(metrics_per_region, [*con.TIER1_REGS])
+    ut.assert_ss_res_decomposition(metrics_per_region, metrics_pooled)
+    df_region_report, pooled_r2, pooled_rmse, average_rmse, average_r2, average_rmse_sq,regional_bias_gap, regional_bias_gap_rmse = ut.report_metrics(metrics_per_region, metrics_pooled, metrics_average, [*con.TIER1_REGS])
+
+    # save results
+    orgpermid_year = ut.resolve_keys(gk, X_test.index)
+    results = y_pred.to_frame('y_pred').join(y_test)
+    results = results.join(orgpermid_year)
+    results = results.join(geo_id)
+    results.to_parquet(con.PRED_DIR/f'predictions_{model_tag}_{configuration}_{condition}_n_iter_{n_iter}_seed_{con.SEED}.parquet')
+
+    # stop time counter
+    total_time = time.perf_counter() - start_total
+
+    # log metrics 
+    ## log parameters & results
+    manifest_dict = {
+        "meta":{
+            "model":model_tag,
+            "condition":condition,
+            "configuration":configuration,
+            "tuning iterations": n_iter,
+            "hyperparameters": model.get_params(),
+            "parameter search log": log,
+            "total processing time": total_time,
+            "fit partition":X_fit.shape,
+            "val partition":X_val.shape,
+            "train partition":X_tr.shape,
+            "test partition":X_test.shape,
+            **git, "library versions": ut.library_versions(LIBRARIES[model_tag]),
+            "timestamp": datetime.now().isoformat(),
+            "used seed": con.SEED
+
+        },
+        "metrics": {
+            "pooled_RMSE":pooled_rmse,
+            "pooled R2":pooled_r2,
+            "average_RMSE":average_rmse,
+            "average R2 (global denominator)":average_r2,
+            "average_rmse_sq":average_rmse_sq,
+            "regional bias gap":regional_bias_gap,
+            "regional bias gap rmse":regional_bias_gap_rmse
+        },
+
+        "region metrics": {
+            "shape": list(df_region_report.shape),
+            "columns": list(df_region_report.columns),
+            "results": df_region_report.to_dict(orient="index"),
+            },
+    }
+    
+    class LogDumper(yaml.SafeDumper):
+        '''custom Dumper that tells PyYAML to serialize NumPy scalars as standard numbers and tuples as regular YAML lists'''
+        pass
+
+    
+    LogDumper.add_representer(
+        tuple,
+        lambda dumper, data: dumper.represent_sequence("tag:yaml.org,2002:seq", data),
+    )
+
+
+    LogDumper.add_multi_representer(
+        np.floating,
+        lambda dumper, data: dumper.represent_float(float(data)),
+    )
+
+    LogDumper.add_multi_representer(
+        np.integer,
+        lambda dumper, data: dumper.represent_int(int(data)),
+    )
+
+    LogDumper.add_multi_representer(
+        np.ndarray,
+        lambda dumper, data: dumper.represent_list(data.tolist()),
+    )
+
+    LogDumper.add_multi_representer(
+        np.bool_,
+        lambda dumper, data: dumper.represent_bool(bool(data)),
+    )
+
+    with open(con.PRED_DIR_MAN / f"results_{model_tag}_{configuration}_{condition}_n_iter_{n_iter}_seed_{con.SEED}.yaml", "w", encoding="utf-8") as f:
+        yaml.dump(manifest_dict, f, Dumper=LogDumper, sort_keys=False, default_flow_style=False)
+
+    print(f'\n[°°°]{model_tag.upper()} regressor sucessfully tested and results saved - elapsed time: {round(total_time/60, 2)}min [°°°]')
